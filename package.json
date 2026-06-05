@@ -1,0 +1,26 @@
+{
+  "name": "echo-ws",
+  "version": "0.1.0",
+  "description": "Lightweight in-memory cache, lock, and pub/sub service over WebSocket.",
+  "main": "client.js",
+  "bin": {
+    "echo-ws-server": "./server.js"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "websocket",
+    "cache",
+    "redis",
+    "pubsub",
+    "lock"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
