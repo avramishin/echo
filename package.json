@@ -1,11 +1,8 @@
 {
-  "name": "echo-ws",
+  "name": "echo",
   "version": "0.1.0",
   "description": "Lightweight in-memory cache, lock, and pub/sub service over WebSocket.",
   "main": "client.js",
-  "bin": {
-    "echo-ws-server": "./server.js"
-  },
   "scripts": {
     "start": "node server.js"
   },

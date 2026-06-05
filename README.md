@@ -24,19 +24,23 @@ No connection authentication is implemented by design. Run Echo only inside a tr
 
 ## Install
 
-From npm, after publication:
+Install Echo directly from GitHub:
 
 ```bash
-npm install echo-ws
+npm install git+https://github.com/avramishin/echo.git
 ```
 
-From a Git repository:
+Or add it to `package.json`:
 
-```bash
-npm install git+https://github.com/your-org/echo-ws.git
+```json
+{
+  "dependencies": {
+    "echo": "git+https://github.com/avramishin/echo.git"
+  }
+}
 ```
 
-For local development:
+Then install dependencies:
 
 ```bash
 npm install
@@ -72,16 +76,10 @@ You can also run the server file directly:
 node server.js
 ```
 
-After package installation, the binary is available as:
-
-```bash
-echo-ws-server
-```
-
 ## Client Usage
 
 ```js
-const EchoClient = require('echo-ws');
+const EchoClient = require('echo');
 
 async function main() {
   const echo = new EchoClient('ws://localhost:7070');
@@ -103,7 +101,7 @@ main().catch(console.error);
 ## Pub/Sub
 
 ```js
-const EchoClient = require('echo-ws');
+const EchoClient = require('echo');
 
 async function main() {
   const subscriber = new EchoClient('ws://localhost:7070');
