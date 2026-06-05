@@ -121,6 +121,39 @@ async function main() {
 main().catch(console.error);
 ```
 
+## Benchmark
+
+Run a local benchmark:
+
+```bash
+npm run benchmark
+```
+
+Useful options:
+
+```bash
+npm run benchmark -- --command=set --ops=50000 --clients=4 --pipeline=64 --payload-size=128
+npm run benchmark -- --command=get --ops=50000 --clients=4 --pipeline=64 --keys=10000
+npm run benchmark -- --command=mixed --ops=50000 --clients=4 --pipeline=64 --keys=10000
+```
+
+Supported commands are `set`, `setttl`, `get`, `setnx`, and `mixed`.
+The benchmark starts an in-process Echo server on `127.0.0.1` and reports throughput plus p50/p95/p99 request latency.
+
+### Benchmark Results
+
+These measurements were made on a MacBook Neo with Node.js `v26.0.0`.
+The benchmark used local loopback `127.0.0.1`, so real network latency and deployment limits are not included.
+
+| Scenario | Ops | Clients | Pipeline | Payload | Throughput | p50 | p95 | p99 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `set` | 200k | 4 | 64 | 128B | 132,759 ops/sec | 1.60ms | 3.52ms | 5.83ms |
+| `get` | 200k | 4 | 64 | 128B | 142,869 ops/sec | 1.59ms | 2.65ms | 5.50ms |
+| `setttl` | 200k | 4 | 64 | 128B | 124,054 ops/sec | 1.64ms | 4.02ms | 6.86ms |
+| `mixed` | 200k | 4 | 64 | 128B | 127,297 ops/sec | 1.71ms | 3.38ms | 7.36ms |
+| `set` | 200k | 4 | 64 | 1KB | 118,495 ops/sec | 1.97ms | 3.08ms | 3.74ms |
+| `set` | 50k | 4 | 1 | 128B | 73,233 ops/sec | 0.05ms | 0.08ms | 0.18ms |
+
 ## Locks
 
 `lock()` returns a token string when the lock is acquired, or `false` when the key is already locked. Pass the same token to `release()` to unlock.
