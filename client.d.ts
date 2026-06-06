@@ -17,6 +17,8 @@ export default class EchoClient extends EventEmitter {
   get<TValue = unknown>(key: string): Promise<TValue | null>;
   delete(key: string): Promise<boolean>;
   setnx<TValue = unknown>(key: string, value: TValue, ttl?: number): Promise<boolean>;
+  increment(key: string, amount?: number): Promise<number>;
+  decrement(key: string, amount?: number): Promise<number>;
   lock(key: string, ttl?: number, token?: string): Promise<string | false>;
   release(key: string, token: string): Promise<boolean>;
   publish<TMessage = unknown>(channel: string, message: TMessage): Promise<number>;

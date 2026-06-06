@@ -24,6 +24,12 @@ function assertString(value, name) {
   }
 }
 
+function assertFiniteNumber(value, name) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw makeError(`${name} must be a finite number`, 'BAD_REQUEST');
+  }
+}
+
 function ttlToExpiresAt(ttl) {
   if (ttl === undefined || ttl === null) return null;
   if (!Number.isFinite(ttl) || ttl < 0) {
@@ -61,6 +67,20 @@ function createEchoServer(options = {}) {
     const expiresAt = ttlToExpiresAt(ttl);
     store.set(key, { value, expiresAt });
     return true;
+  }
+
+  function changeNumber(key, amount) {
+    assertFiniteNumber(amount, 'amount');
+    const entry = getEntry(key);
+    const currentValue = entry ? entry.value : 0;
+
+    if (typeof currentValue !== 'number' || !Number.isFinite(currentValue)) {
+      throw makeError('stored value must be a finite number', 'BAD_REQUEST');
+    }
+
+    const nextValue = currentValue + amount;
+    store.set(key, { value: nextValue, expiresAt: entry ? entry.expiresAt : null });
+    return nextValue;
   }
 
   function deleteLock(key) {
@@ -127,6 +147,16 @@ function createEchoServer(options = {}) {
         assertString(key, 'key');
         if (getEntry(key)) return false;
         return setKey(key, value, ttl);
+      }
+      case 'increment': {
+        const { key, amount = 1 } = args;
+        assertString(key, 'key');
+        return changeNumber(key, amount);
+      }
+      case 'decrement': {
+        const { key, amount = 1 } = args;
+        assertString(key, 'key');
+        return changeNumber(key, -amount);
       }
       case 'lock': {
         const { key, ttl, token } = args;

@@ -177,6 +177,28 @@ class EchoClient extends EventEmitter {
   }
 
   /**
+   * Increments a numeric value by amount.
+   *
+   * @param {string} key Cache key.
+   * @param {number} [amount] Increment amount, default 1.
+   * @returns {Promise<number>} Updated numeric value.
+   */
+  increment(key, amount) {
+    return this._request('increment', { key, amount });
+  }
+
+  /**
+   * Decrements a numeric value by amount.
+   *
+   * @param {string} key Cache key.
+   * @param {number} [amount] Decrement amount, default 1.
+   * @returns {Promise<number>} Updated numeric value.
+   */
+  decrement(key, amount) {
+    return this._request('decrement', { key, amount });
+  }
+
+  /**
    * Acquires a named lock.
    *
    * @param {string} key Lock key.

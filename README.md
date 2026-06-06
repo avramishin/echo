@@ -8,6 +8,8 @@ It keeps data in memory and supports simple cache, lock, and pub/sub commands:
 - `get`
 - `delete`
 - `setnx`
+- `increment`
+- `decrement`
 - `lock`
 - `release`
 - `publish`
@@ -89,11 +91,12 @@ async function main() {
 
   await echo.set('user:1', { name: 'Ada' }, 10_000);
   const user = await echo.get('user:1');
+  const visits = await echo.increment('visits');
 
   const created = await echo.setnx('job:42', 'running', 30_000);
   const keys = await echo.list('user:');
 
-  console.log({ user, created, keys });
+  console.log({ user, visits, created, keys });
   echo.close();
 }
 
@@ -115,12 +118,13 @@ async function main() {
 
   await echo.set<User>('user:1', { name: 'Ada' }, 10_000);
   const user = await echo.get<User>('user:1');
+  const balance = await echo.decrement('credits', 5);
 
   await echo.subscribe<{ type: string }>('events', (message, channel) => {
     console.log(channel, message.type);
   });
 
-  console.log(user?.name);
+  console.log(user?.name, balance);
   echo.close();
 }
 
@@ -249,6 +253,26 @@ Acquires a named lock.
 - returns `false` when the key is already locked
 
 Use a TTL for locks to avoid stale locks after process failures.
+
+### increment(key, amount)
+
+Increments a numeric value and returns the updated result.
+
+- `key`: non-empty string
+- `amount`: optional finite number, default `1`
+- returns updated numeric value
+
+If the key does not exist, Echo starts from `0`. If the stored value is not a finite number, the command returns `BAD_REQUEST`. Existing TTL is preserved.
+
+### decrement(key, amount)
+
+Decrements a numeric value and returns the updated result.
+
+- `key`: non-empty string
+- `amount`: optional finite number, default `1`
+- returns updated numeric value
+
+If the key does not exist, Echo starts from `0`. If the stored value is not a finite number, the command returns `BAD_REQUEST`. Existing TTL is preserved.
 
 ### release(key, token)
 
