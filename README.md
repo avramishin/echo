@@ -46,6 +46,8 @@ Then install dependencies:
 npm install
 ```
 
+Echo ships bundled TypeScript declarations. In TypeScript projects, importing `echo` resolves to the typed client API without extra setup.
+
 ## Start Server
 
 ```bash
@@ -96,6 +98,39 @@ async function main() {
 }
 
 main().catch(console.error);
+```
+
+## TypeScript Usage
+
+```ts
+import EchoClient from 'echo';
+
+type User = {
+  name: string;
+};
+
+async function main() {
+  const echo = new EchoClient('ws://localhost:7070', { timeout: 5_000 });
+  await echo.connect();
+
+  await echo.set<User>('user:1', { name: 'Ada' }, 10_000);
+  const user = await echo.get<User>('user:1');
+
+  await echo.subscribe<{ type: string }>('events', (message, channel) => {
+    console.log(channel, message.type);
+  });
+
+  console.log(user?.name);
+  echo.close();
+}
+
+main().catch(console.error);
+```
+
+For server-side imports, use:
+
+```ts
+import { createEchoServer } from 'echo/server';
 ```
 
 ## Pub/Sub

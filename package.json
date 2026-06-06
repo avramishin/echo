@@ -3,6 +3,28 @@
   "version": "0.1.0",
   "description": "Lightweight in-memory cache, lock, and pub/sub service over WebSocket.",
   "main": "client.js",
+  "types": "client.d.ts",
+  "exports": {
+    ".": {
+      "types": "./client.d.ts",
+      "require": "./client.js",
+      "default": "./client.js"
+    },
+    "./server": {
+      "types": "./server.d.ts",
+      "require": "./server.js",
+      "default": "./server.js"
+    }
+  },
+  "files": [
+    "client.js",
+    "client.d.ts",
+    "server.js",
+    "server.d.ts",
+    "benchmark.js",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "start": "node server.js",
     "benchmark": "node benchmark.js"
