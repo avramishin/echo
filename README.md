@@ -16,8 +16,9 @@ It keeps data in memory and supports simple cache, lock, and pub/sub commands:
 - `subscribe`
 - `flush`
 - `list`
+- `metrics`
 
-No connection authentication is implemented by design. Run Echo only inside a trusted private network.
+Echo can require a shared secret token during the WebSocket connection handshake. Clients also send a service name so server logs show which service connected.
 
 ## Requirements
 
@@ -67,11 +68,12 @@ Environment variables:
 - `ECHO_HOST` binds the server host, default `0.0.0.0`
 - `ECHO_PORT` or `PORT` sets the server port, default `7070`
 - `ECHO_SWEEP_INTERVAL` sets expired key cleanup interval in milliseconds, default `60000`
+- `ECHO_SECRET_TOKEN` enables connection authentication when set
 
 Example:
 
 ```bash
-ECHO_PORT=8080 npm start
+ECHO_PORT=8080 ECHO_SECRET_TOKEN=shared-secret npm start
 ```
 
 You can also run the server file directly:
@@ -86,7 +88,10 @@ node server.js
 const EchoClient = require('echo');
 
 async function main() {
-  const echo = new EchoClient('ws://localhost:7070');
+  const echo = new EchoClient('ws://localhost:7070', {
+    clientName: 'users-service',
+    secretToken: 'shared-secret'
+  });
   await echo.connect();
 
   await echo.set('user:1', { name: 'Ada' }, 10_000);
@@ -113,7 +118,11 @@ type User = {
 };
 
 async function main() {
-  const echo = new EchoClient('ws://localhost:7070', { timeout: 5_000 });
+  const echo = new EchoClient('ws://localhost:7070', {
+    timeout: 5_000,
+    clientName: 'users-service',
+    secretToken: 'shared-secret'
+  });
   await echo.connect();
 
   await echo.set<User>('user:1', { name: 'Ada' }, 10_000);
@@ -143,8 +152,14 @@ import { createEchoServer } from 'echo/server';
 const EchoClient = require('echo');
 
 async function main() {
-  const subscriber = new EchoClient('ws://localhost:7070');
-  const publisher = new EchoClient('ws://localhost:7070');
+  const subscriber = new EchoClient('ws://localhost:7070', {
+    clientName: 'events-subscriber',
+    secretToken: 'shared-secret'
+  });
+  const publisher = new EchoClient('ws://localhost:7070', {
+    clientName: 'events-publisher',
+    secretToken: 'shared-secret'
+  });
 
   await subscriber.connect();
   await publisher.connect();
@@ -178,6 +193,7 @@ npm run benchmark -- --command=mixed --ops=50000 --clients=4 --pipeline=64 --key
 
 Supported commands are `set`, `setttl`, `get`, `setnx`, and `mixed`.
 The benchmark starts an in-process Echo server on `127.0.0.1` and reports throughput plus p50/p95/p99 request latency.
+When `ECHO_SECRET_TOKEN` is set, the benchmark passes it to its local clients automatically. You can also pass `--secret-token=shared-secret` and `--client-name=benchmark`.
 
 ### Benchmark Results
 
@@ -309,7 +325,24 @@ Lists existing non-expired cache keys.
 - `prefix`: optional string prefix filter
 - returns `string[]`
 
+### metrics()
+
+Returns internal server counters.
+
+- `connectedClients`: current number of open client connections
+- `totalConnections`: total accepted client connections since server start
+- `commandCalls`: per-command call counters
+- `unknownCommands`: per-command counters for unknown command names
+
 ## Wire Protocol
+
+When authentication is enabled, clients connect with `secretToken` and `clientName` query parameters:
+
+```text
+ws://localhost:7070?clientName=users-service&secretToken=shared-secret
+```
+
+Only `secretToken` is used for authentication. `clientName` is informational and appears in server logs.
 
 Clients send JSON messages:
 
@@ -367,4 +400,4 @@ Published messages are pushed to subscribers:
 - Expired cache keys and locks are physically removed by a centralized cleanup pass every minute by default.
 - Echo is intended for small deployments and simple coordination tasks, not as a durable database.
 - Run a single Echo instance when clients need a shared cache or shared locks.
-- Put Echo behind private network boundaries. There is no authentication or authorization layer.
+- Use `ECHO_SECRET_TOKEN` in deployments where clients are not already isolated by private network boundaries.

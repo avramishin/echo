@@ -7,6 +7,22 @@ const { WebSocketServer } = require('ws');
 const DEFAULT_PORT = Number(process.env.ECHO_PORT || process.env.PORT || 7070);
 const DEFAULT_HOST = process.env.ECHO_HOST || '0.0.0.0';
 const DEFAULT_SWEEP_INTERVAL = Number(process.env.ECHO_SWEEP_INTERVAL || 60_000);
+const DEFAULT_SECRET_TOKEN = process.env.ECHO_SECRET_TOKEN;
+const KNOWN_COMMANDS = new Set([
+  'set',
+  'get',
+  'delete',
+  'setnx',
+  'increment',
+  'decrement',
+  'lock',
+  'release',
+  'publish',
+  'subscribe',
+  'flush',
+  'list',
+  'metrics'
+]);
 
 function now() {
   return Date.now();
@@ -30,6 +46,18 @@ function assertFiniteNumber(value, name) {
   }
 }
 
+function tokensEqual(actual, expected) {
+  if (typeof actual !== 'string' || typeof expected !== 'string') return false;
+  const actualBuffer = Buffer.from(actual);
+  const expectedBuffer = Buffer.from(expected);
+  if (actualBuffer.length !== expectedBuffer.length) return false;
+  return crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+function isKnownCommand(command) {
+  return KNOWN_COMMANDS.has(command);
+}
+
 function ttlToExpiresAt(ttl) {
   if (ttl === undefined || ttl === null) return null;
   if (!Number.isFinite(ttl) || ttl < 0) {
@@ -42,10 +70,30 @@ function createEchoServer(options = {}) {
   const port = options.port ?? DEFAULT_PORT;
   const host = options.host ?? DEFAULT_HOST;
   const sweepInterval = options.sweepInterval ?? DEFAULT_SWEEP_INTERVAL;
+  const secretToken = options.secretToken ?? DEFAULT_SECRET_TOKEN;
   const store = new Map();
   const locks = new Map();
   const subscribers = new Map();
-  const wss = new WebSocketServer({ port, host });
+  const metrics = {
+    connectedClients: 0,
+    totalConnections: 0,
+    commandCalls: Object.create(null),
+    unknownCommands: Object.create(null)
+  };
+  const wss = new WebSocketServer({
+    port,
+    host,
+    verifyClient: (info, done) => {
+      if (!secretToken) {
+        done(true);
+        return;
+      }
+
+      const requestUrl = new URL(info.req.url, `ws://${info.req.headers.host || 'localhost'}`);
+      const token = requestUrl.searchParams.get('secretToken');
+      done(tokensEqual(token, secretToken), 401, 'Unauthorized');
+    }
+  });
   const sweeper = setInterval(sweepExpired, sweepInterval);
   if (typeof sweeper.unref === 'function') sweeper.unref();
 
@@ -122,6 +170,19 @@ function createEchoServer(options = {}) {
     if (ws.readyState === ws.OPEN) {
       ws.send(JSON.stringify(payload));
     }
+  }
+
+  function incrementCounter(counters, name) {
+    counters[name] = (counters[name] || 0) + 1;
+  }
+
+  function readMetrics() {
+    return {
+      connectedClients: metrics.connectedClients,
+      totalConnections: metrics.totalConnections,
+      commandCalls: { ...metrics.commandCalls },
+      unknownCommands: { ...metrics.unknownCommands }
+    };
   }
 
   function handleCommand(ws, command, args) {
@@ -212,12 +273,21 @@ function createEchoServer(options = {}) {
         }
         return keys;
       }
+      case 'metrics': {
+        return readMetrics();
+      }
       default:
         throw makeError(`unknown command: ${command}`, 'UNKNOWN_COMMAND');
     }
   }
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, request) => {
+    const requestUrl = new URL(request.url, `ws://${request.headers.host || 'localhost'}`);
+    ws.clientName = requestUrl.searchParams.get('clientName') || 'unknown';
+    metrics.connectedClients += 1;
+    metrics.totalConnections += 1;
+    console.log(`Echo client connected: ${ws.clientName}`);
+
     ws.on('message', (raw) => {
       let request;
       try {
@@ -231,6 +301,11 @@ function createEchoServer(options = {}) {
       try {
         if (!request || typeof request.command !== 'string') {
           throw makeError('command must be a string', 'BAD_REQUEST');
+        }
+        if (request.command in metrics.commandCalls || isKnownCommand(request.command)) {
+          incrementCounter(metrics.commandCalls, request.command);
+        } else {
+          incrementCounter(metrics.unknownCommands, request.command);
         }
         const result = handleCommand(ws, request.command, request.args || {});
         send(ws, { id, ok: true, result });
@@ -246,7 +321,10 @@ function createEchoServer(options = {}) {
       }
     });
 
-    ws.on('close', () => unsubscribeSocket(ws));
+    ws.on('close', () => {
+      metrics.connectedClients = Math.max(0, metrics.connectedClients - 1);
+      unsubscribeSocket(ws);
+    });
     ws.on('error', () => unsubscribeSocket(ws));
   });
 

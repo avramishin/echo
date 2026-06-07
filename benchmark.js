@@ -12,7 +12,9 @@ const DEFAULTS = {
   payloadSize: 128,
   keys: 10_000,
   ttl: 60_000,
-  host: '127.0.0.1'
+  host: '127.0.0.1',
+  clientName: 'benchmark',
+  secretToken: ''
 };
 
 function readOption(name, fallback) {
@@ -44,6 +46,13 @@ function createPayload(size) {
   return {
     data: 'x'.repeat(size)
   };
+}
+
+function connectionUrl(url, clientName, secretToken) {
+  const connection = new URL(url);
+  connection.searchParams.set('clientName', clientName);
+  if (secretToken) connection.searchParams.set('secretToken', secretToken);
+  return connection.toString();
 }
 
 function argsFor(command, index, options, value) {
@@ -86,7 +95,7 @@ async function openSocket(url) {
 async function preload(url, options, value) {
   if (options.command !== 'get' && options.command !== 'mixed') return;
 
-  const ws = await openSocket(url);
+  const ws = await openSocket(connectionUrl(url, 'benchmark-preload', options.secretToken));
   let nextId = 1;
   const pending = new Map();
 
@@ -116,7 +125,7 @@ async function preload(url, options, value) {
 }
 
 async function runClient(url, clientIndex, options, value, latencies) {
-  const ws = await openSocket(url);
+  const ws = await openSocket(connectionUrl(url, `${options.clientName}-${clientIndex}`, options.secretToken));
   const pending = new Map();
   let nextLocal = clientIndex;
   let sent = 0;
@@ -178,7 +187,9 @@ async function main() {
     payloadSize: readNumber('payload-size', DEFAULTS.payloadSize),
     keys: readNumber('keys', DEFAULTS.keys),
     ttl: readNumber('ttl', DEFAULTS.ttl),
-    host: readOption('host', DEFAULTS.host)
+    host: readOption('host', DEFAULTS.host),
+    clientName: readOption('client-name', DEFAULTS.clientName),
+    secretToken: readOption('secret-token', process.env.ECHO_SECRET_TOKEN || DEFAULTS.secretToken)
   };
 
   if (options.clients < 1) throw new Error('clients must be at least 1');

@@ -8,12 +8,14 @@ class EchoClient extends EventEmitter {
    * Creates an Echo WebSocket client.
    *
    * @param {string} url WebSocket URL, for example ws://localhost:7070.
-   * @param {{timeout?: number}} [options] Client options.
+   * @param {{timeout?: number, clientName?: string, secretToken?: string}} [options] Client options.
    */
   constructor(url, options = {}) {
     super();
     this.url = url;
     this.timeout = options.timeout || 5000;
+    this.clientName = options.clientName || 'unknown';
+    this.secretToken = options.secretToken;
     this.ws = null;
     this.nextId = 1;
     this.pending = new Map();
@@ -31,7 +33,7 @@ class EchoClient extends EventEmitter {
     }
 
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(this.url);
+      const ws = new WebSocket(this._connectionUrl());
       this.ws = ws;
 
       const cleanup = () => {
@@ -51,6 +53,13 @@ class EchoClient extends EventEmitter {
       ws.once('open', onOpen);
       ws.once('error', onError);
     });
+  }
+
+  _connectionUrl() {
+    const url = new URL(this.url);
+    url.searchParams.set('clientName', this.clientName);
+    if (this.secretToken) url.searchParams.set('secretToken', this.secretToken);
+    return url.toString();
   }
 
   _attach(ws) {
@@ -155,7 +164,7 @@ class EchoClient extends EventEmitter {
   }
 
   /**
-   * Deletes a key.
+   * Deletes a key. 
    *
    * @param {string} key Cache key.
    * @returns {Promise<boolean>} True when the key existed and was deleted.
@@ -264,6 +273,15 @@ class EchoClient extends EventEmitter {
    */
   list(prefix) {
     return this._request('list', { prefix });
+  }
+
+  /**
+   * Reads internal server metrics.
+   *
+   * @returns {Promise<{connectedClients: number, totalConnections: number, commandCalls: Object<string, number>, unknownCommands: Object<string, number>}>} Server metrics snapshot.
+   */
+  metrics() {
+    return this._request('metrics');
   }
 
   /**
